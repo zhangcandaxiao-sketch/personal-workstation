@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "id": "project-declaration-template",
+      "name": "项目申报书模板",
+      "path": "D:\\zhuomian\\项目申报\\有效项目信息\\模板  项目申报.docx",
+      "app": "C:\\Users\\Administrator\\AppData\\Local\\Kingsoft\\WPS Office\\12.1.0.28505\\office6\\wps.exe",
+      "appArgs": ["/prometheus", "/wps"]
+    }
+  ]
+}
