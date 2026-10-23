@@ -60,6 +60,8 @@ export interface WEvent {
   };
   /** 兜底活动：常驻博物馆 / 科技馆，仅当没有合适活动时才安排 */
   fallback?: boolean;
+  /** 同一活动在其他信源的链接（实时抓取合并时产生） */
+  otherSources?: EventSource[];
 }
 
 export interface CategoryMeta {

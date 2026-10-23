@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 // @ts-expect-error local dev-only launcher plugin (plain ESM, no types)
 import { localLauncherPlugin } from './launcher/vite-plugin-local-launcher.mjs';
+// @ts-expect-error local dev-only weekend events scraper plugin (plain ESM, no types)
+import { weekendEventsPlugin } from './src/features/weekend-planner/server/vite-plugin-weekend-events.mjs';
 
 // ── 妙搭部署协议（参考《妙搭应用构建产物规范》）─────────────────────────
 // 构建期环境变量（托管构建时由部署链路自动注入；本地开发不需要，缺省回退）：
@@ -102,7 +104,14 @@ function collectRoutePaths(srcDir: string): string[] {
 }
 
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss(), localLauncherPlugin(), miaodaOutputPlugin(), sparkJsonPlugin()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    localLauncherPlugin(),
+    weekendEventsPlugin(),
+    miaodaOutputPlugin(),
+    sparkJsonPlugin(),
+  ],
   // 生产构建：JS/CSS 引用带 CDN 前缀（无 CDN 时退回 base path）；dev 恒为 /
   base: command === 'build' ? cdnPrefix || basePath : '/',
   define: {

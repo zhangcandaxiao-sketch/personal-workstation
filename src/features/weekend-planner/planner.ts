@@ -105,7 +105,8 @@ const SLOTS: SlotId[] = ['morning', 'afternoon', 'evening'];
 
 /**
  * 活动综合分（五分制）。
- * 核心 = 三维度平均分；再叠加偏好倾斜、类别新鲜感、时段合理性、同区动线。
+ * 核心 = 三维度平均分（占主导，推荐按分数排序）；
+ * 其余为温和的平局区分项：偏好倾斜、类别新鲜感、时段合理性、同区动线。
  */
 const scoreFor = (
   ev: WEvent,
@@ -114,37 +115,37 @@ const scoreFor = (
   usedCategories: Set<CategoryId>,
   lastDistrict: string | null,
 ): number => {
-  let s = eventScore(ev); // 五分制平均分（核心）
+  let s = eventScore(ev); // 五分制平均分（核心，占主导）
   // 偏好倾斜（温和，不盖过平均分）
-  if (prefs.ai && ev.category === 'ai') s += 0.8;
-  if (prefs.fun) s += 0.12 * (ev.scores.fun - 3);
-  if (prefs.learning) s += 0.12 * (ev.scores.education - 3);
+  if (prefs.ai && ev.category === 'ai') s += 0.6;
+  if (prefs.fun) s += 0.1 * (ev.scores.fun - 3);
+  if (prefs.learning) s += 0.1 * (ev.scores.education - 3);
   if (prefs.freeOnly && ev.free) s += 0.4;
-  // 类别新鲜感（同周末尽量不重复同类）
-  if (!usedCategories.has(ev.category)) s += 0.9;
+  // 类别新鲜感（同周末尽量不重复同类；仅作平局区分）
+  if (!usedCategories.has(ev.category)) s += 0.5;
   // 时段合理性
   s += slotCategoryBonus(ev, slot);
   // 同区动线（紧接的上一活动同区，少跑路）
   if (lastDistrict && lastDistrict !== '待通知' && ev.district === lastDistrict)
-    s += 0.6;
+    s += 0.4;
   return s;
 };
 
-/** 时段对不同类别的加成/减分，让活动落在合理时段 */
+/** 时段对不同类别的加成/减分，让活动落在合理时段（温和，不盖过平均分） */
 const slotCategoryBonus = (ev: WEvent, slot: SlotId): number => {
   const c = ev.category;
   if (slot === 'evening') {
-    if (c === 'experience' || c === 'show') return 1.2;
-    if (c === 'market') return 0.8;
-    if (c === 'exhibition' || c === 'science') return -0.8;
+    if (c === 'experience' || c === 'show') return 0.9;
+    if (c === 'market') return 0.6;
+    if (c === 'exhibition' || c === 'science') return -0.6;
   } else if (slot === 'morning') {
-    if (c === 'market') return 0.8;
-    if (c === 'exhibition') return 0.5;
-    if (c === 'science') return 0.4;
+    if (c === 'market') return 0.6;
+    if (c === 'exhibition') return 0.4;
+    if (c === 'science') return 0.3;
   } else {
-    if (c === 'ai') return 0.8;
-    if (c === 'exhibition' || c === 'market') return 0.5;
-    if (c === 'science') return 0.4;
+    if (c === 'ai') return 0.6;
+    if (c === 'exhibition' || c === 'market') return 0.4;
+    if (c === 'science') return 0.3;
   }
   return 0;
 };

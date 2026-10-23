@@ -11,6 +11,7 @@ import JobSearchPage from '@/features/job-search/JobSearchPage';
 import WeekendPlannerPage from '@/features/weekend-planner/WeekendPlannerPage';
 import TencentSheetPage from '@/features/tencent-sheet/TencentSheetPage';
 import XianyuWorkbenchPage from '@/features/xianyu-workbench/XianyuWorkbenchPage';
+import WorkEmailPage from '@/features/work-email/WorkEmailPage';
 import NotFoundPage from '@/pages/NotFoundPage/NotFoundPage';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="weekend-planner" element={<WeekendPlannerPage />} />
         <Route path="tencent-sheet" element={<TencentSheetPage />} />
         <Route path="xianyu-workbench" element={<XianyuWorkbenchPage />} />
+        <Route path="work-email" element={<WorkEmailPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

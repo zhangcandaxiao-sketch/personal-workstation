@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileText, Building2, Newspaper, Library, BookMarked, Briefcase, Compass, GraduationCap, Fish } from 'lucide-react';
+import { FileText, Building2, Newspaper, Library, BookMarked, Briefcase, Compass, GraduationCap, Fish, Mail } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -145,6 +145,18 @@ export default function HomePage() {
             </CardHeader>
           </Card>
         </a>
+
+        <Link to="/work-email">
+          <Card className="hover-elevate h-full">
+            <CardHeader>
+              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Mail className="h-5 w-5" />
+              </div>
+              <CardTitle>单位邮箱</CardTitle>
+              <CardDescription>一键打开 163 网易邮箱登录页（新窗口）</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
       </div>
     </main>
   );

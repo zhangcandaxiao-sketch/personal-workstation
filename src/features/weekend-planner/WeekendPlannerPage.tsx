@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,6 +9,13 @@ import {
   Banknote,
   CalendarDays,
   ExternalLink,
+  RefreshCw,
+  RotateCcw,
+  Radio,
+  ChevronDown,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -36,6 +43,14 @@ import {
   type PlanDay,
   type PlanItem,
 } from './planner';
+import {
+  refreshLiveEvents,
+  saveLivePayload,
+  loadSavedLive,
+  clearSavedLive,
+  type LiveEventsPayload,
+  type LiveSourceStatus,
+} from './live-events';
 import EventCard, { type WeekendBadge } from './components/EventCard';
 import ItineraryDay from './components/ItineraryDay';
 
@@ -106,6 +121,9 @@ const dateShort = (iso: string) => {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 };
 
+const hhmm = (d: Date) =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
 // 活动是否落在某周末（周六或周日）
 const onWeekend = (w: Weekend, e: WEvent): boolean =>
   isAvailable(e, w.satISO) || isAvailable(e, w.sunISO);
@@ -119,10 +137,33 @@ export default function WeekendPlannerPage() {
   // 手动「换一个」覆盖：key = 日期|时段
   const [manual, setManual] = useState<Record<string, SlotManual>>({});
 
+  // 实时抓取状态
+  const [live, setLive] = useState<LiveEventsPayload | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  // 恢复本地缓存
+  useEffect(() => {
+    const saved = loadSavedLive();
+    if (saved) {
+      setLive(saved.payload);
+      setSavedAt(saved.savedAt);
+    }
+  }, []);
+
+  // 有效活动集合：实时抓取结果 + 内置兜底场馆（科技馆/博物馆）
+  const effectiveEvents = useMemo(() => {
+    if (!live) return EVENTS;
+    const builtinFallback = EVENTS.filter((e) => e.fallback);
+    return [...live.events, ...builtinFallback];
+  }, [live]);
+
   const weekend = weekends[selected];
   const plan = useMemo(
-    () => buildPlan(weekend, prefs, EVENTS),
-    [weekend, prefs],
+    () => buildPlan(weekend, prefs, effectiveEvents),
+    [weekend, prefs, effectiveEvents],
   );
 
   // 叠加手动覆盖后的最终行程
@@ -133,7 +174,8 @@ export default function WeekendPlannerPage() {
         const m = manual[slotKey(day.dateISO, slot)];
         let ev: WEvent | undefined;
         if (m) {
-          if (m.eventId) ev = EVENTS.find((e) => e.id === m.eventId);
+          if (m.eventId)
+            ev = effectiveEvents.find((e) => e.id === m.eventId);
         } else {
           ev = day.items.find((i) => i.slot === slot)?.event;
         }
@@ -142,7 +184,7 @@ export default function WeekendPlannerPage() {
       return { ...day, items };
     };
     return { sat: apply(plan.sat), sun: apply(plan.sun) };
-  }, [plan, manual]);
+  }, [plan, manual, effectiveEvents]);
 
   const stats = useMemo(() => planStats(displayPlan), [displayPlan]);
 
@@ -151,6 +193,35 @@ export default function WeekendPlannerPage() {
     () => new Set(Object.keys(manual)),
     [manual],
   );
+
+  /** 从全部信源实时抓取最新活动 */
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const payload = await refreshLiveEvents(true);
+      setLive(payload);
+      setSavedAt(Date.now());
+      saveLivePayload(payload);
+      setManual({});
+      setPanelOpen(true);
+    } catch (e) {
+      setRefreshError(e instanceof Error ? e.message : '刷新失败');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  /** 恢复为内置数据 */
+  const handleRestoreBuiltin = () => {
+    setLive(null);
+    setSavedAt(null);
+    clearSavedLive();
+    setManual({});
+    setRefreshError(null);
+    setPanelOpen(false);
+  };
 
   /** 换一个：按评分顺序取该时段下一个合格活动 */
   const swapSlot = (dayISO: string, slot: SlotId) => {
@@ -190,7 +261,7 @@ export default function WeekendPlannerPage() {
         usedCategories,
         lastDistrict,
       },
-      EVENTS,
+      effectiveEvents,
       prefs,
     );
     setManual((prev) => ({
@@ -214,14 +285,15 @@ export default function WeekendPlannerPage() {
   // 近期 AI 大会（含工作日，按日期）
   const aiEvents = useMemo(
     () =>
-      EVENTS.filter((e) => e.category === 'ai')
+      effectiveEvents
+        .filter((e) => e.category === 'ai')
         .sort((a, b) => a.startDate.localeCompare(b.startDate)),
-    [],
+    [effectiveEvents],
   );
 
   // 活动合集：时间范围（scope） + 分类（catFilter），按周末与相关度排序
   const listEvents = useMemo(() => {
-    const list = EVENTS.filter((e) => {
+    const list = effectiveEvents.filter((e) => {
       if (catFilter !== 'all' && e.category !== catFilter) return false;
       const thisW = onWeekend(weekends[0], e);
       const nextW = onWeekend(weekends[1], e);
@@ -244,7 +316,7 @@ export default function WeekendPlannerPage() {
     return list.sort(
       (a, b) => firstDate(a).localeCompare(firstDate(b)) || rel(b) - rel(a),
     );
-  }, [catFilter, scope, weekends]);
+  }, [catFilter, scope, weekends, effectiveEvents]);
 
   // 卡片角标：本周末 / 下周末 / 两周皆可
   const weekendBadge = (e: WEvent): WeekendBadge | undefined => {
@@ -268,6 +340,8 @@ export default function WeekendPlannerPage() {
 
   const tabName = ['本周末', '下周末', '第三周'];
 
+  const okCount = live?.sources.filter((s) => s.ok).length ?? 0;
+
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       <Link
@@ -278,17 +352,118 @@ export default function WeekendPlannerPage() {
         返回工作台
       </Link>
 
-      <div className="mt-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <CalendarDays className="h-5 w-5" />
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CalendarDays className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold">周末去哪里 · 武汉</h1>
+            <p className="text-xs text-muted-foreground">
+              汇集近期有娱乐、学习、教育意义的活动，为你规划周末两天
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-semibold">周末去哪里 · 武汉</h1>
-          <p className="text-xs text-muted-foreground">
-            汇集近期有娱乐、学习、教育意义的活动，为你规划周末两天
-          </p>
+
+        {/* 刷新操作区 */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPanelOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Radio className="h-3.5 w-3.5" />
+            信源状态
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 transition-transform',
+                panelOpen && 'rotate-180',
+              )}
+            />
+          </button>
+          {live && (
+            <button
+              type="button"
+              onClick={handleRestoreBuiltin}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              恢复内置
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')}
+            />
+            {refreshing ? '抓取中…' : '刷新活动'}
+          </button>
         </div>
       </div>
+
+      {/* 数据来源说明条 */}
+      <div
+        className={cn(
+          'mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-2 text-[11px]',
+          live
+            ? 'border-emerald-200 bg-emerald-50/60 text-emerald-700'
+            : 'bg-muted/30 text-muted-foreground',
+        )}
+      >
+        {live ? (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>
+              实时信源数据（{okCount}/{live.sources.length} 个信源可用，
+              共 {live.events.length} 个活动）
+            </span>
+            {savedAt && (
+              <span className="text-emerald-600/80">
+                更新于 {hhmm(new Date(savedAt))}
+                {live.cached ? '（服务端缓存）' : ''}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span>当前为内置活动数据</span>
+            <span>点击「刷新活动」从 7 个信源实时抓取最新活动</span>
+          </>
+        )}
+      </div>
+
+      {/* 刷新错误提示 */}
+      {refreshError && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{refreshError}</span>
+        </div>
+      )}
+
+      {/* 信源状态面板 */}
+      {panelOpen && (
+        <Card className="mt-3">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium">
+              信源抓取明细（每次刷新实时抓取，失败可点官网直查）
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(live?.sources ?? []).map((s) => (
+                <SourceRow key={s.id} source={s} />
+              ))}
+              {!live && (
+                <p className="col-span-full text-[11px] text-muted-foreground">
+                  尚未刷新，点击右上角「刷新活动」查看各信源状态
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 控制区 */}
       <Card className="mt-5">
@@ -364,6 +539,11 @@ export default function WeekendPlannerPage() {
                 </a>
               );
             })}
+            {aiEvents.length === 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                暂未抓取到 AI 类活动
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -472,6 +652,44 @@ export default function WeekendPlannerPage() {
         活动时间与票务均来自官方/平台公开信息（已附信源），临近出行请以主办方最新公告为准
       </p>
     </main>
+  );
+}
+
+function SourceRow({ source }: { source: LiveSourceStatus }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border bg-card p-2.5">
+      {source.ok ? (
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+      ) : (
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-xs font-medium">{source.name}</p>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {source.ms}ms
+          </span>
+        </div>
+        {source.ok ? (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            抓取到 {source.count} 个活动
+          </p>
+        ) : (
+          <p className="mt-0.5 text-[11px] text-red-600">
+            {source.error ?? '抓取失败'}
+          </p>
+        )}
+        <a
+          href={source.homepage}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+        >
+          {source.ok ? '信源主页' : '去官网查看'}
+          <ExternalLink className="h-2.5 w-2.5" />
+        </a>
+      </div>
+    </div>
   );
 }
 
