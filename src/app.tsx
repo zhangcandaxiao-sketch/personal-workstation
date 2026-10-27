@@ -5,6 +5,7 @@ import TodoPage from '@/features/todo/TodoPage';
 import ProjectTemplatePage from '@/features/project-template/ProjectTemplatePage';
 import InvestmentSystemPage from '@/features/investment-system/InvestmentSystemPage';
 import BriefingWriterPage from '@/features/briefing-writer/BriefingWriterPage';
+import WechatWriterPage from '@/features/wechat-writer/WechatWriterPage';
 import KnowledgeBasePage from '@/features/knowledge-base/KnowledgeBasePage';
 import FeishuDocsPage from '@/features/feishu-docs/FeishuDocsPage';
 import JobSearchPage from '@/features/job-search/JobSearchPage';
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="project-template" element={<ProjectTemplatePage />} />
         <Route path="investment-system" element={<InvestmentSystemPage />} />
         <Route path="briefing-writer" element={<BriefingWriterPage />} />
+        <Route path="wechat-writer" element={<WechatWriterPage />} />
         <Route path="knowledge-base" element={<KnowledgeBasePage />} />
         <Route path="feishu-docs" element={<FeishuDocsPage />} />
         <Route path="job-search" element={<JobSearchPage />} />
