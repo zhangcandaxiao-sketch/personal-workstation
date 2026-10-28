@@ -141,19 +141,23 @@ function AppIcon({ m }: { m: ModuleItem }) {
   );
 }
 
-// 文件夹图标：2×2 等比例缩小的 App 图标
+// 文件夹图标：2×2 等比例缩小的 App 图标（带模块名）
 function FolderIcon({ f }: { f: FolderItem }) {
   return (
     <div className="flex w-full flex-col items-center gap-1.5">
-      <div className="grid aspect-square w-full grid-cols-2 content-center gap-[8%] rounded-[22%] bg-muted/70 p-[10%]">
+      <div className="grid aspect-square w-full grid-cols-2 content-center gap-x-[5%] gap-y-[3%] rounded-[22%] bg-muted/70 p-[7%]">
         {f.children.slice(0, 4).map((k) => {
           const Icon = k.icon;
           return (
-            <div
-              key={k.id}
-              className={`flex aspect-square items-center justify-center rounded-[24%] bg-gradient-to-br ${k.tint}`}
-            >
-              <Icon className="h-1/2 w-1/2 text-white" />
+            <div key={k.id} className="flex flex-col items-center gap-[4%]">
+              <div
+                className={`flex aspect-square w-[78%] items-center justify-center rounded-[24%] bg-gradient-to-br ${k.tint}`}
+              >
+                <Icon className="h-1/2 w-1/2 text-white" />
+              </div>
+              <span className="w-full truncate text-center text-[10px] font-semibold leading-tight text-foreground">
+                {k.title}
+              </span>
             </div>
           );
         })}
@@ -240,6 +244,11 @@ function DesktopCell({
           <button
             type="button"
             onClick={() => onOpenFolder(cell.id)}
+            title={
+              isFolder(cell)
+                ? cell.children.map((k) => k.title).join('、')
+                : undefined
+            }
             className="block w-full"
           >
             <FolderIcon f={cell} />
@@ -484,7 +493,7 @@ export default function HomePage() {
                     }}
                     className="cursor-grab active:cursor-grabbing"
                   >
-                    <AppIcon m={k} />
+                    {appLink(k, <AppIcon m={k} />)}
                   </div>
                 ))}
               </div>
